@@ -17,8 +17,6 @@
       user-mail-address        "o.hase3@gmail.com"
       user-theme-directory     (expand-file-name "themes/" user-emacs-directory)
       user-autoload-directory  (expand-file-name "autoload/" user-emacs-directory))
-
-
 
 ;;;; Constants
 
@@ -82,15 +80,15 @@
 (defconst HAS-DVIPNG
   (executable-find "dvipng")
   "Do we have dvipng?")
-
-
 
 ;;;; Package Initialization
 
 (require 'package)
 
 (push '("melpa" . "http://melpa.org/packages/") package-archives)
-(push '("cselpa" . "https://elpa.thecybershadow.net/packages/") package-archives)
+;;(push '("marmalade" . "http://marmalade-repo.org/packages/") package-archives)
+;; Some guy's private repo.
+;; (push '("cselpa" . "https://elpa.thecybershadow.net/packages/") package-archives)
 (package-initialize)
 
 
@@ -108,8 +106,6 @@
 (use-package bind-key)
 
 (load-file (expand-file-name "customize.el" user-emacs-directory))
-
-
 
 ;;;; Macros
 
@@ -173,8 +169,6 @@ Useful to quickly uncomment a `comment'."
                 for hook in hooks
                 collect (macroexpand `(add-prog-hook ,hook))
                 collect (macroexpand `(add-text-hook ,hook)))))
-
-
 
 ;;;; Packages
 
@@ -218,6 +212,9 @@ Useful to quickly uncomment a `comment'."
 
 ;;; Miscellaneous
 
+(use-package form-feed
+  :hook (emacs-lisp-mode . form-feed-mode))
+
 (use-package reformatter   ; https://github.com/purcell/reformatter.el
   :commands reformatter-define)
 
@@ -250,8 +247,6 @@ Useful to quickly uncomment a `comment'."
 
 (use-package 2048-game
   :commands 2084-game)
-
-
 
 ;;; Which-key Configuration
 
@@ -289,8 +284,6 @@ Useful to quickly uncomment a `comment'."
     "M-g"       "goto"
     )
   (which-key-mode))
-
-
 
 ;;; Ivy Configuration
 
@@ -346,8 +339,6 @@ Useful to quickly uncomment a `comment'."
 
 (use-package amx                        ; Select previous commands by default
   :after ivy)
-
-
 
 ;;; Smartparens
 
@@ -390,10 +381,7 @@ Useful to quickly uncomment a `comment'."
   (show-smartparens-global-mode))
 
 
-
 ;;; Yasnippet WIP
-
-
 
 ;;;; Builtin Modes
 
@@ -417,8 +405,6 @@ Useful to quickly uncomment a `comment'."
 
 (eval-when-compile (require 'org-indent))
 (with-eval-after-load 'org-indent (add-hook 'org-mode-hook #'org-indent-mode))
-
-
 
 ;;;; Languages
 
@@ -515,8 +501,6 @@ Useful to quickly uncomment a `comment'."
   :after python
   :bind (:map python-mode-map
               ("C-c C-f" . python-black-buffer)))
-
-
 
 ;;; Themes
 
@@ -537,7 +521,9 @@ Useful to quickly uncomment a `comment'."
 
 (load-theme 'doom-one)
 
-
+(if IS-GUI (eval-after-load 'form-feed
+             '(set-face-attribute 'form-feed-line nil :strike-through
+                                  (face-attribute 'default :foreground))))
 
 ;;;; Functions
 
@@ -567,8 +553,6 @@ ALL-FRAMES is passed directly to `other-window'."
 
 (defalias 'exit 'save-buffers-kill-emacs)
 (defalias 'quit 'save-buffers-kill-emacs)
-
-
 
 ;;;; Keybindings
 
@@ -602,8 +586,6 @@ ALL-FRAMES is passed directly to `other-window'."
  :prefix-map user-prefix-map
  ("c f" . find-config-file)
  ("c d" . find-config-directory))
-
-
 
 ;;;; Hooks
 
@@ -632,8 +614,6 @@ ALL-FRAMES is passed directly to `other-window'."
 
 ;;; Behaviour hooks
 (add-hook 'before-save-hook #'whitespace-cleanup) ; Clean up on save
-
-
 
 ;;;; Miscellaneous
 
@@ -662,8 +642,8 @@ ALL-FRAMES is passed directly to `other-window'."
       hscroll-step 1
       hscroll-margin 2)
 
-;;; init.el ends here
-
 ;; Local Variables:
 ;; flycheck-disabled-checkers: (emacs-lisp)
 ;; End:
+
+;;; init.el ends here
