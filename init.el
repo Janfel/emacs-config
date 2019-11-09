@@ -20,10 +20,6 @@
 
 ;;;; Constants
 
-(defconst IS-GUI
-  (display-graphic-p)
-  "Are we running on a GUI Emacs?")
-
 (defconst IS-WINDOWS
   (eq system-type 'windows-nt)
   "Are we running on a WinTel system?")
@@ -39,6 +35,10 @@
 (defconst IS-ROOT
   (string-equal "root" (getenv "USER"))
   "Are you a ROOT user?")
+
+(defconst HAS-GUI
+  (display-graphic-p)
+  "Are we running on a GUI Emacs?")
 
 (defconst HAS-RG
   (executable-find "rg")
@@ -91,16 +91,16 @@
 ;; (push '("cselpa" . "https://elpa.thecybershadow.net/packages/") package-archives)
 (package-initialize)
 
-
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)
   (package-install 'use-package))
 
-(setq use-package-enable-imenu-support t)
-(require 'use-package)
-(setq use-package-always-ensure t
+(setq use-package-enable-imenu-support t
+      use-package-always-ensure t
       use-package-expand-minimally t
-      use-package-compute-statistics t)
+      use-package-compute-statistics nil)
+
+(require 'use-package)
 
 (use-package dash)
 (use-package bind-key)
@@ -203,7 +203,7 @@ Useful to quickly uncomment a `comment'."
 ;;; Text editing
 
 (use-package hungry-delete
-  :bind (("M-<backspace>" . hungry-delete-backward)
+  :bind (("M-DEL" . hungry-delete-backward)
          ("M-<delete>" . hungry-delete-forward)))
 
 (use-package move-text
@@ -224,7 +224,7 @@ Useful to quickly uncomment a `comment'."
 (use-package format-all
   :bind ("C-c C-f" . format-all-buffer))
 
-(if IS-GUI
+(if HAS-GUI
     (progn
       (use-package all-the-icons)
       (use-package neotree
@@ -335,7 +335,7 @@ Useful to quickly uncomment a `comment'."
 
 (use-package swiper
   :after ivy
-  :bind ("C-s" . swiper-isearch))
+  :bind ("C-f" . swiper-isearch))
 
 (use-package amx                        ; Select previous commands by default
   :after ivy)
@@ -376,7 +376,17 @@ Useful to quickly uncomment a `comment'."
                    :post-handlers '(sp-latex-skip-double-quote))
     (sp-local-pair "\"<" "\">"
                    :unless '(sp-latex-point-after-backslash sp-in-math-p)
-                   :post-handlers '(sp-latex-skip-double-quote)))
+                   :post-handlers '(sp-latex-skip-double-quote))
+    (sp-local-pair "\\(" nil :post-handlers '((jfl/wrap-spaces "SPC")
+                                              (jfl/newline-indent "RET")))
+    (sp-local-pair "\\[" nil :post-handlers '((jfl/wrap-spaces "SPC")
+                                              (jfl/newline-indent "RET"))))
+
+  (defun sp-wrap-sexp (pair)
+    (interactive (list (completing-read "Pair: " (sp--get-pair-list-wrap) nil 'require-match)))
+    (sp-wrap-with-pair pair))
+  (push '(sp-wrap-sexp . regexp-quote) ivy-re-builders-alist)
+
   (smartparens-global-mode)
   (show-smartparens-global-mode))
 
@@ -399,7 +409,9 @@ Useful to quickly uncomment a `comment'."
    ("<mouse-1>" . doc-view-next-page)
    ("<mouse-3>" . doc-view-previous-page)
    ("C-<mouse-4>" . doc-view-enlarge)
-   ("C-<mouse-5>" . doc-view-shrink)))
+   ("C-<mouse-5>" . doc-view-shrink)
+   ("C-f" . doc-view-search)
+   ("C-s" . nil)))
 
 ;;; Org Mode
 
@@ -411,11 +423,11 @@ Useful to quickly uncomment a `comment'."
 ;;; Common Lisp
 
 (defvar quicklisp-home (or (getenv "QUICKLISP_HOME") "~/quicklisp/")
-    "The directory where quicklisp is installed.")
+  "The directory where quicklisp is installed.")
 
 (use-package slime
   :commands slime
-  :custom ((slime-net-coding-system . ('utf-8-unix))
+  :custom (;;(slime-net-coding-system . ('utf-8-unix))
            (slime-repl-history-file . ((expand-file-name "slime-history.eld" user-emacs-directory))))
   :init
   (setq slime-default-lisp 'sbcl)
@@ -452,6 +464,7 @@ Useful to quickly uncomment a `comment'."
   (eval-after-load 'latex
     '(bind-keys :map LaTeX-mode-map
                 ("C-c C-f"   . nil)
+                ("$"         . nil )    ; Smartparens does this better.
                 ("C-c C-S-f" . TeX-font)))
   (eval-after-load 'which-key
     '(which-key-add-major-mode-key-based-replacements 'latex-mode
@@ -480,6 +493,14 @@ Useful to quickly uncomment a `comment'."
 
 
 ;;; Pascal
+
+(defun jfl/pascal/company-setup ()
+  "Customize company for `pascal-mode'."
+  (when (boundp 'company-backends)
+    (set (make-local-variable 'company-backends)
+         (remove 'company-capf company-backends))))
+
+(add-hook 'pascal-mode-hook #'jfl/pascal/company-setup)
 
 (with-eval-after-load 'pascal
   (setq pascal-indent-level 2)
@@ -521,9 +542,13 @@ Useful to quickly uncomment a `comment'."
 
 (load-theme 'doom-one)
 
-(if IS-GUI (eval-after-load 'form-feed
-             '(set-face-attribute 'form-feed-line nil :strike-through
-                                  (face-attribute 'default :foreground))))
+(eval-after-load 'hl-line
+  '(set-face-attribute 'sp-show-pair-match-content-face nil :background
+                       (face-attribute 'hl-line :background)))
+
+(if HAS-GUI (eval-after-load 'form-feed
+              '(set-face-attribute 'form-feed-line nil :strike-through
+                                   (face-attribute 'default :foreground))))
 
 ;;;; Functions
 
@@ -558,19 +583,39 @@ ALL-FRAMES is passed directly to `other-window'."
 
 ;; Unset keys
 (unbind-keys
- "M-DEL"
  "<menu>"
- ;; "C-z"
  "<XF86Forward>"
  "<XF86Back>")
+
+(comment (use-package rebinder
+           :load-path "lisp/rebinder"
+           :defer 0.2
+           :config
+           (bind-key "C-ö" (rebinder-dynamic-binding "C-x"))
+           (bind-key "C-ä" (rebinder-dynamic-binding "C-c"))
+           (bind-keys :map rebinder-mode-map
+                      ("C-x" . kill-region)
+                      ("C-c" . kill-ring-save))
+           (rebinder-hook-to-mode 't 'after-change-major-mode-hook)
+           (rebinder-override)) endcomment)
+
+;; Use C-x and C-c properly.
+(keyboard-translate ?\C-x 'control-x)
+(keyboard-translate ?\C-c 'control-c)
+(global-set-key [control-x] 'kill-region)
+(global-set-key [control-c] 'kill-ring-save)
+(define-key key-translation-map (kbd "C-ö") (kbd "C-x"))
+(define-key key-translation-map (kbd "C-ä") (kbd "C-c"))
 
 ;; Set keys
 (bind-keys
  ("C-<tab>"           . other-window)
  ("C-S-<iso-lefttab>" . other-window-backwards)
- ("C-ö"               . kill-region)
- ("C-ä"               . kill-ring-save)
- ("C-p"               . yank)
+ ("C-v"               . yank)
+ ("C-z"               . undo-tree-undo)
+ ("C-S-z"             . undo-tree-redo)
+ ("C-s"               . save-buffer)
+ ("C-x C-ä"           . save-buffers-kill-terminal)
  ("C-x M-k"           . kill-current-buffer)
  ;;("C-c I" . find-config-file)
  ("C-M-<prior>"       . backward-page)
@@ -579,13 +624,15 @@ ALL-FRAMES is passed directly to `other-window'."
 
 (bind-keys*
  ("C-e" . execute-extended-command)
- ("C-f" . swiper-isearch))
+ )
 
 (bind-keys
  :prefix "<menu>"
  :prefix-map user-prefix-map
  ("c f" . find-config-file)
  ("c d" . find-config-directory))
+
+(bind-key "C-x &" user-prefix-map)
 
 ;;;; Hooks
 
@@ -609,8 +656,10 @@ ALL-FRAMES is passed directly to `other-window'."
 
 (add-progtext-hooks                     ; In programming and text buffers:
  jfl|line-numbers                       ; Show line numbers
- hl-line-mode                           ; Highlight current line
  )
+
+(if HAS-GUI
+    (add-progtext-hook hl-line-mode))   ; Highlight current line
 
 ;;; Behaviour hooks
 (add-hook 'before-save-hook #'whitespace-cleanup) ; Clean up on save
@@ -638,7 +687,7 @@ ALL-FRAMES is passed directly to `other-window'."
       fast-but-imprecise-scrolling nil
       mouse-wheel-scroll-amount '(1 ((shift) . 5))
       mouse-wheel-progressive-speed nil
-;; Horizontal Scroll
+      ;; Horizontal Scroll
       hscroll-step 1
       hscroll-margin 2)
 
