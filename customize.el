@@ -15,10 +15,10 @@
      ("german" "\"`" "\"'" nil))))
  '(ansi-color-names-vector
    ["#282c34" "#ff6c6b" "#98be65" "#ECBE7B" "#51afef" "#c678dd" "#46D9FF" "#bbc2cf"])
- '(auto-package-update-delete-old-versions t t)
- '(auto-package-update-hide-results t t)
- '(auto-package-update-interval 7 t)
- '(auto-package-update-prompt-before-update t t)
+ '(auto-package-update-delete-old-versions t)
+ '(auto-package-update-hide-results t)
+ '(auto-package-update-interval 7)
+ '(auto-package-update-prompt-before-update t)
  '(c-basic-offset 4)
  '(c-default-style
    (quote
@@ -34,7 +34,7 @@
  '(helm-grep-ag-command
    "rg --color=always --smart-case --no-heading --line-number %s %s %s")
  '(indent-tabs-mode nil)
- '(ivy-wrap t t)
+ '(ivy-wrap t)
  '(jdee-db-active-breakpoint-face-colors (cons "#1B2229" "#51afef"))
  '(jdee-db-requested-breakpoint-face-colors (cons "#1B2229" "#98be65"))
  '(jdee-db-spec-breakpoint-face-colors (cons "#1B2229" "#3f444a"))
@@ -50,7 +50,7 @@
  '(show-paren-delay 0)
  '(slime-net-coding-system (quote utf-8-unix) t)
  '(slime-repl-history-file "/home/janfel/.emacs.d/slime-history.eld" t)
- '(sp-highlight-pair-overlay nil t)
+ '(sp-highlight-pair-overlay nil)
  '(vc-annotate-background "#282c34")
  '(vc-annotate-color-map
    (list
@@ -73,8 +73,8 @@
     (cons 340 "#5B6268")
     (cons 360 "#5B6268")))
  '(vc-annotate-very-old-color nil)
- '(which-key-prefix-prefix "+" t)
- '(which-key-separator " " t))
+ '(which-key-prefix-prefix "+")
+ '(which-key-separator " "))
 
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
