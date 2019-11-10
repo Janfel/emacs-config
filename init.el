@@ -296,7 +296,8 @@ Useful to quickly uncomment a `comment'."
          ("C-c V"   . ivy-pop-view)
          ("C-c C-r" . ivy-resume)
          :map ivy-minibuffer-map
-         ("RET" . ivy-alt-done)    ; Make RET recurse into directories
+         ("RET" . ivy-alt-done)    ; Make RET recurse into directories.
+         ("C-RET" . ivy-immediate-done) ; Exit with input not candidate.
          ("C-j" . ivy-done)
          ("C-<up>" . ivy-previous-history-element)
          ("C-<down>" . ivy-next-history-element)
@@ -360,27 +361,35 @@ Useful to quickly uncomment a `comment'."
          ("C-)" . sp-forward-sexp))
   :config
   (require 'smartparens-config)
-  ;; Remove this when #624 comes through.
-  (cl-loop for trigger in '("(" "{" "[") do
-           (sp-local-pair 'prog-mode trigger nil :post-handlers '((jfl/wrap-spaces "SPC"))))
-  ;; Open new line on RET after open brace.
-  (sp-local-pair 'prog-mode "{" nil :post-handlers '((jfl/wrap-spaces    "SPC")
-                                                     (jfl/newline-indent "RET")))
-  (sp-local-pair 'pascal-mode "begin" "end" :post-handlers '((jfl/newline-indent "RET")))
-  (sp-with-modes '(tex-mode
-                   plain-tex-mode
-                   latex-mode
-                   LaTeX-mode)
-    (sp-local-pair "\"`" "\"'"
-                   :unless '(sp-latex-point-after-backslash sp-in-math-p)
-                   :post-handlers '(sp-latex-skip-double-quote))
-    (sp-local-pair "\"<" "\">"
-                   :unless '(sp-latex-point-after-backslash sp-in-math-p)
-                   :post-handlers '(sp-latex-skip-double-quote))
-    (sp-local-pair "\\(" nil :post-handlers '((jfl/wrap-spaces "SPC")
-                                              (jfl/newline-indent "RET")))
-    (sp-local-pair "\\[" nil :post-handlers '((jfl/wrap-spaces "SPC")
-                                              (jfl/newline-indent "RET"))))
+
+  (--each '("(" "{" "[")
+    (sp-local-pair 'prog-mode it nil
+                   :post-handlers '(;; Remove this when #624 comes through.
+                                    (jfl/wrap-spaces "SPC")
+                                    ;; Open new line on RET after open brace.
+                                    (jfl/newline-indent "RET"))))
+  ;; Language specific
+  (eval-after-load 'pascal
+    '(sp-local-pair 'pascal-mode "begin" "end"
+                    :post-handlers '((jfl/newline-indent "RET"))))
+
+  (eval-after-load 'tex-mode
+    '(sp-with-modes '(tex-mode
+                      plain-tex-mode
+                      latex-mode
+                      LaTeX-mode)
+       (sp-local-pair "\"`" "\"'"        ; German quotes.
+                      :unless '(sp-latex-point-after-backslash sp-in-math-p)
+                      :post-handlers '(sp-latex-skip-double-quote))
+       (sp-local-pair "\"<" "\">"        ; French quotes.
+                      :unless '(sp-latex-point-after-backslash sp-in-math-p)
+                      :post-handlers '(sp-latex-skip-double-quote))
+
+       (sp-local-pair "\\(" "\\)" :post-handlers '((jfl/wrap-spaces "SPC")
+                                                   (jfl/newline-indent "RET")))
+       (sp-local-pair "\\[" "\\]" :post-handlers '((jfl/wrap-spaces "SPC")
+                                                   (jfl/newline-indent "RET")))
+       ))
 
   (defun sp-wrap-sexp (pair)
     (interactive (list (completing-read "Pair: " (sp--get-pair-list-wrap) nil 'require-match)))
