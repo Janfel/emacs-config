@@ -29,7 +29,7 @@
  '(company-tooltip-idle-delay 0.2)
  '(custom-safe-themes
    (quote
-    ("70ed3a0f434c63206a23012d9cdfbe6c6d4bb4685ad64154f37f3c15c10f3b90" "2d1fe7c9007a5b76cea4395b0fc664d0c1cfd34bb4f1860300347cdad67fb2f9" "82358261c32ebedfee2ca0f87299f74008a2e5ba5c502bde7aaa15db20ee3731" default)))
+    ("0fe9f7a04e7a00ad99ecacc875c8ccb4153204e29d3e57e9669691e6ed8340ce" "1ca1f43ca32d30b05980e01fa60c107b02240226ac486f41f9b790899f6f6e67" "32fd809c28baa5813b6ca639e736946579159098d7768af6c68d78ffa32063f4" "e47c0abe03e0484ddadf2ae57d32b0f29f0b2ddfe7ec810bd6d558765d9a6a6c" "70ed3a0f434c63206a23012d9cdfbe6c6d4bb4685ad64154f37f3c15c10f3b90" "2d1fe7c9007a5b76cea4395b0fc664d0c1cfd34bb4f1860300347cdad67fb2f9" "82358261c32ebedfee2ca0f87299f74008a2e5ba5c502bde7aaa15db20ee3731" default)))
  '(fci-rule-color "#5B6268")
  '(helm-grep-ag-command
    "rg --color=always --smart-case --no-heading --line-number %s %s %s")
@@ -44,8 +44,9 @@
  '(opascal-indent-level 2)
  '(package-selected-packages
    (quote
-    (flycheck markdown-mode goto-line-preview live-preview auctex counsel swiper ivy helm which-key use-package undo-tree org-bullets nord-theme neotree move-text hungry-delete format-all doom-themes diminish auto-package-update all-the-icons 2048-game)))
+    (haskell-mode folding checkdoc-url-buttonize hideshowviz flycheck markdown-mode goto-line-preview live-preview auctex counsel swiper ivy helm which-key use-package undo-tree org-bullets nord-theme neotree move-text hungry-delete format-all doom-themes diminish auto-package-update all-the-icons 2048-game)))
  '(pascal-indent-level 2)
+ '(pdf-view-midnight-colors (cons "#27212E" "#FFFFFF"))
  '(preview-image-type (quote dvipng) t)
  '(show-paren-delay 0)
  '(slime-net-coding-system (quote utf-8-unix) t)

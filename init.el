@@ -15,7 +15,8 @@
 ;; User Information
 (setq user-full-name           "Jan Felix Langenbach"
       user-mail-address        "o.hase3@gmail.com"
-      user-theme-directory     (expand-file-name "themes/" user-emacs-directory)
+      user-lisp-directory      (expand-file-name "lisp/"     user-emacs-directory)
+      user-theme-directory     (expand-file-name "themes/"   user-emacs-directory)
       user-autoload-directory  (expand-file-name "autoload/" user-emacs-directory))
 
 ;;;; Constants
@@ -85,6 +86,8 @@
 
 (require 'package)
 
+(push user-lisp-directory load-path)
+
 (push '("melpa" . "http://melpa.org/packages/") package-archives)
 ;;(push '("marmalade" . "http://marmalade-repo.org/packages/") package-archives)
 ;; Some guy's private repo.
@@ -125,15 +128,6 @@ Useful to quickly uncomment a `comment'."
 (defmacro unbind-keys (&rest keys)
   "Unbind multiple KEYS specified by strings for `kbd'."
   (cons 'progn (cl-loop for key in keys collect `(unbind-key ,key))))
-
-(defmacro translate-key (key target)
-  "Define a translation by binding KEY to TARGET in `key-translation-map'."
-  `(bind-key ,key ,target key-translation-map))
-
-(defmacro translate-keys (&rest keys)
-  "Bind KEYS as pairs in `key-translation-map'."
-  (cons 'progn (cl-loop for keypair in (-partition 2 keys)
-                        collect (macroexpand `(translate-key ,@keypair)))))
 
 (defmacro add-hooks (target &rest hooks)
   "Add multiple HOOKS to TARGET."
@@ -187,7 +181,7 @@ Useful to quickly uncomment a `comment'."
   (delight 'visual-line-mode nil 'simple))
 
 (use-package auto-package-update
-  :defer 1
+  :defer 0.2
   :custom
   (auto-package-update-interval 7) ;; in days
   (auto-package-update-prompt-before-update t)
@@ -198,9 +192,18 @@ Useful to quickly uncomment a `comment'."
 
 (use-package company
   :hook ((prog-mode text-mode comint-mode) . company-mode)
-  :bind ("S-SPC" . company-complete))
+  :bind ("C-SPC" . company-complete))
+
+;; (use-package hydra
+;;   :defer t)
 
 ;;; Text editing
+
+(comment (use-package folding
+  :hook (find-file . folding-mode-find-file-hook)
+  :config
+  (--each '((ruby-mode "#{{{" "#}}}" nil noforce))
+    (apply #'folding-add-to-marks-list it))) endcomment)
 
 (use-package hungry-delete
   :bind (("M-DEL" . hungry-delete-backward)
@@ -209,6 +212,10 @@ Useful to quickly uncomment a `comment'."
 (use-package move-text
   :bind (("M-<down>" . move-text-down)
          ("M-<up>" . move-text-up)))
+
+(use-package hideshowvis
+  :ensure nil
+  :after hideshow)
 
 ;;; Miscellaneous
 
@@ -219,7 +226,12 @@ Useful to quickly uncomment a `comment'."
   :commands reformatter-define)
 
 (use-package flycheck
-  :hook (after-init . global-flycheck-mode))
+  :hook (after-init . global-flycheck-mode)
+  :config
+  (eval-after-load 'cc-mode
+    '(setq-default
+      flycheck-gcc-language-standard "c++17"
+      flycheck-clang-language-standard "c++17")))
 
 (use-package format-all
   :bind ("C-c C-f" . format-all-buffer))
@@ -241,7 +253,14 @@ Useful to quickly uncomment a `comment'."
 
 (use-package undo-tree
   :delight
-  :hook (after-init . global-undo-tree-mode))
+  :hook (after-init . global-undo-tree-mode)
+  :config
+  (bind-keys
+   :map undo-tree-map
+    ("C-z"    . undo-tree-undo)
+    ("<undo>" . undo-tree-undo)
+    ("C-S-z"  . undo-tree-redo)
+    ("<redo>" . undo-tree-redo)))
 
 ;;; Games
 
@@ -336,7 +355,9 @@ Useful to quickly uncomment a `comment'."
 
 (use-package swiper
   :after ivy
-  :bind ("C-f" . swiper-isearch))
+  :bind (("C-f" . swiper-isearch)
+         ("M-f" . nil)
+         ("M-f ." . swiper-isearch-thing-at-point)))
 
 (use-package amx                        ; Select previous commands by default
   :after ivy)
@@ -401,6 +422,13 @@ Useful to quickly uncomment a `comment'."
 
 
 ;;; Yasnippet WIP
+(use-package yasnippet
+  :defer 0.3
+  :config
+  (yas-global-mode))
+
+(use-package yasnippet-snippets
+  :after yasnippet)
 
 ;;;; Builtin Modes
 
@@ -426,6 +454,18 @@ Useful to quickly uncomment a `comment'."
 
 (eval-when-compile (require 'org-indent))
 (with-eval-after-load 'org-indent (add-hook 'org-mode-hook #'org-indent-mode))
+
+(eval-after-load 'help-mode
+  '(bind-keys
+    :map help-mode-map
+    ("<mouse-8>" . help-go-back)
+    ("<mouse-9>" . help-go-forward)))
+
+(eval-after-load 'info
+  '(bind-keys
+    :map Info-mode-map
+    ("<mouse-8>" . Info-history-back)
+    ("<mouse-9>" . Info-history-forward)))
 
 ;;;; Languages
 
@@ -446,11 +486,24 @@ Useful to quickly uncomment a `comment'."
   (load (expand-file-name "slime-helper.el" quicklisp-home)))
 
 (with-eval-after-load 'lisp-mode
-  (bind-key "C-c C-f" (lambda () (indent-region (point-min) (point-max))) lisp-mode-map))
+  (bind-key "C-c C-f" (lambda () (interactive) (indent-region (point-min) (point-max))) lisp-mode-map))
 
 ;;; Elisp
 
 (add-hook 'emacs-lisp-mode-hook (lambda () (set 'comment-column 40)))
+
+;;; Haskell
+
+(use-package haskell-mode
+  :mode (("\\.hsc\\'" . haskell-mode)
+         ("\\.l[gh]s\\'" . literate-haskell-mode)
+         ("\\.hsig\\'" . haskell-mode)
+         ("\\.[gh]s\\'" . haskell-mode)
+         ("\\.cabal\\'" . haskell-cabal-mode)
+         ("\\.chs\\'" . haskell-c2hs-mode)
+         ("\\.ghci\\'" . ghci-script-mode)
+         ("\\.dump-simpl\\'" . ghc-core-mode)
+         ("\\.hcr\\'" . ghc-core-mode)))
 
 ;;; LaTeX
 
@@ -492,13 +545,13 @@ Useful to quickly uncomment a `comment'."
 ;;; Markdown
 
 (use-package markdown-mode
+  :bind (:map markdown-mode-map ("C-c C-f" . markdownfmt-buffer))
   :mode (("README\\.md\\'" . gfm-mode)
          ("\\.md\\'" . markdown-mode)
          ("\\.markdown\\'" . markdown-mode))
   :config
   (reformatter-define markdownfmt
-    :program "markdownfmt")
-  (bind-key "C-c C-f" #'markdownfmt-buffer markdown-mode-map))
+    :program "markdownfmt"))
 
 
 ;;; Pascal
@@ -580,6 +633,17 @@ ALL-FRAMES is passed directly to `other-window'."
   (interactive "p")
   (other-window (* count -1) all-frames))
 
+;; See https://unix.stackexchange.com/questions/76531/emacs-make-portion-of-buffer-readonly
+(defun make-region-read-only (start end)
+  (interactive "*r")
+  (let ((inhibit-read-only t))
+    (put-text-property start end 'read-only t)))
+
+(defun make-region-read-write (start end)
+  (interactive "*r")
+  (let ((inhibit-read-only t))
+    (put-text-property start end 'read-only nil)))
+
 ;; (cl-loop for (func . doc) in
 ;;          '(("find-config-directory" . "Open the config directory in dired")
 ;;            )
@@ -616,24 +680,36 @@ ALL-FRAMES is passed directly to `other-window'."
 (define-key key-translation-map (kbd "C-ö") (kbd "C-x"))
 (define-key key-translation-map (kbd "C-ä") (kbd "C-c"))
 
+(bind-key "C-<return>" (kbd "C-RET") key-translation-map)
+(if IS-WINDOWS (define-key key-translation-map (kbd "<apps>") (kbd "<menu>")))
+
 ;; Set keys
 (bind-keys
  ("C-<tab>"           . other-window)
  ("C-S-<iso-lefttab>" . other-window-backwards)
  ("C-v"               . yank)
- ("C-z"               . undo-tree-undo)
- ("C-S-z"             . undo-tree-redo)
  ("C-s"               . save-buffer)
+ ("C-S-s"             . write-file)
  ("C-x C-ä"           . save-buffers-kill-terminal)
  ("C-x M-k"           . kill-current-buffer)
  ;;("C-c I" . find-config-file)
  ("C-M-<prior>"       . backward-page)
- ("C-M-<next>"        . forward-page))
-
+ ("C-M-<next>"        . forward-page)
+ ("<mouse-8>"         . backward-page)
+ ("<mouse-9>"         . forward-page)
+ ("M-SPC"             . set-mark-command)
+ ("S-SPC"             . cycle-spacing)
+ ("C-S-k"             . kill-whole-line))
 
 (bind-keys*
  ("C-e" . execute-extended-command)
  )
+
+(bind-keys
+ :prefix "M-f"
+ :prefix-map search-prefix-map
+ ("o" . occur)
+ ("w" . isearch-forward-word))
 
 (bind-keys
  :prefix "<menu>"
@@ -684,6 +760,8 @@ ALL-FRAMES is passed directly to `other-window'."
 
 ;; Make shell open in the current buffer.
 (push '("^\\*shell\\*$" . (display-buffer-same-window)) display-buffer-alist)
+
+(setq-default cursor-type 'bar)
 
 ;; Smooth Scrolling
 ;; Copied from: https://github.com/MatthewZMD/.emacs.d/blob/master/elisp/init-scroll.el
