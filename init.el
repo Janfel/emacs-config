@@ -127,7 +127,7 @@
 
 (defmacro uncomment (&rest forms)
   "Collects FORMS into `progn'.
- Useful to quickly uncomment a `comment'."
+Useful to quickly uncomment a `comment'."
   (cons 'progn forms))
 
 (defmacro unbind-keys (&rest keys)
@@ -169,11 +169,24 @@
                 collect (macroexpand `(add-prog-hook ,hook))
                 collect (macroexpand `(add-text-hook ,hook)))))
 
-;;;; Something
+;;;; Modes
+
+(defun enable-indent-tabs-mode ()
+  "Set `indent-tabs-mode' to t."
+  (setq indent-tabs-mode t))
+
+(defun disable-indent-tabs-mode ()
+  "Set `indent-tabs-mode' to nil."
+  (setq indent-tabs-mode nil))
+
 (defvar lisp-mode-common-hook nil
   "Hook called by all Lisp modes for common initialization.")
-
-;;;; Modes
+
+(add-hook 'lisp-mode-common-hook #'disable-indent-tabs-mode)
+
+(defun run-lisp-mode-common-hook (&rest args)
+  "Run `lisp-mode-common-hook' with ARGS."
+  (apply #'run-hook-with-args 'lisp-mode-common-hook args))
 
 (define-minor-mode whitespace-cleanup-mode
   "Runs `whitespace-cleanup' before a file is saved."
@@ -552,7 +565,7 @@
          ("\\.cljc\\'"                        . clojurec-mode)
          ("\\(?:build\\|profile\\)\\.boot\\'" . clojure-mode))
   :init
-  (add-hook 'clojure-mode-hook (lambda () (run-hooks 'lisp-mode-common-hook))))
+  (add-hook 'clojure-mode-hook #'run-lisp-mode-common-hook))
 
 (use-package cider
   ;; https://github.com/clojure-emacs/cider
@@ -575,7 +588,7 @@
 (defvar quicklisp-home (or (getenv "QUICKLISP_HOME") "~/quicklisp/")
   "The directory where quicklisp is installed.")
 
-(add-hook 'lisp-mode-hook (lambda () (run-hooks 'lisp-mode-common-hook)))
+(add-hook 'lisp-mode-hook #'run-lisp-mode-common-hook)
 
 (use-package slime
   ;; https://github.com/slime/slime
@@ -594,11 +607,9 @@
 
 ;;; Elisp
 
-(add-hook
- 'emacs-lisp-mode-hook
- (lambda ()
-   (run-hooks 'lisp-mode-common-hook)
-   (setq comment-column 40)))
+(add-hooks emacs-lisp-mode-hook
+           run-lisp-mode-common-hook
+           (lambda () (setq comment-column 40)))
 
 ;;; Haskell
 
@@ -615,12 +626,13 @@
   :bind (:map haskell-mode-map
               ("C-c C-z" . haskell-interactive-switch)
               ("C-c C-c" . haskell-process-load-file))
-  :config (add-hook 'haskell-mode-hook (lambda () (setq indent-tabs-mode nil))))
+  :config (add-hook 'haskell-mode-hook #'disable-indent-tabs-mode))
 
 ;;; LaTeX
 
-(add-hook 'latex-mode-hook #'latex-electric-env-pair-mode)
-(add-hook 'latex-mode-hook (lambda () (setq tab-width tex-indent-basic)))
+(add-hooks latex-mode-hook
+           #'latex-electric-env-pair-mode
+           (lambda () (setq tab-width tex-indent-basic)))
 
 (use-package latex-preview-pane
   :commands latex-preview-pane-mode)
@@ -661,7 +673,7 @@
   :mode "\\.lua$"
   :interpreter "lua"
   :custom (lua-indent-level 2)
-  :config (setq tab-width lua-indent-level))
+  :init (add-hook 'lua-mode-hook (lambda () (setq tab-width lua-indent-level))))
 
 ;;; Markdown
 
@@ -670,11 +682,10 @@
   :mode (("README\\.md\\'" . gfm-mode)
          ("\\.md\\'" . markdown-mode)
          ("\\.markdown\\'" . markdown-mode))
+  :init
+  (add-hook 'markdown-mode-hook (lambda () (setq tab-width markdown-list-indent-width)))
   :config
-  (setq tab-width markdown-list-indent-width)
-  (reformatter-define markdownfmt
-    :program "markdownfmt"))
-
+  (reformatter-define markdownfmt :program "markdownfmt"))
 
 ;;; Pascal
 
@@ -684,11 +695,12 @@
     (set (make-local-variable 'company-backends)
          (remove 'company-capf company-backends))))
 
-(add-hook 'pascal-mode-hook #'jfl/pascal/company-setup)
-(add-hook 'pascal-mode-hook (lambda () (setq tab-width pascal-indent-level)))
+(add-hooks pascal-mode-hook
+           #'jfl/pascal/company-setup
+           (lambda () (setq tab-width pascal-indent-level)))
 
-(eval-after-load 'pascal
-  '(reformatter-define ptop
+(with-eval-after-load 'pascal
+  (reformatter-define ptop
      :program "/usr/bin/ptop"
      :args `("-i" ,(number-to-string pascal-indent-level)
              "-c" "/home/janfel/.config/pascal/ptop.cfg"
@@ -730,7 +742,13 @@
 
 ;;; Scheme
 
-(add-hook 'scheme-mode-hook (lambda () (run-hooks 'lisp-mode-common-hook)))
+(add-hook 'scheme-mode-hook #'run-lisp-mode-common-hook)
+
+;;; YAML
+
+(use-package yaml-mode
+  :mode "\\.ya?ml\\'"
+  :init (add-hook 'yaml-mode-hook #'disable-indent-tabs-mode))
 
 
 ;;; Themes
@@ -902,32 +920,6 @@
 
 ;;;; Miscellaneous
 
-(progn ; Indentation
-  (setq-default
-   tab-width 4
-   indent-tabs-mode t)
-  (add-hook 'lisp-mode-common-hook (lambda () (setq indent-tabs-mode nil)))
-  )
-
-;; Indentation
-;; (setq jfl-tab-width 4
-;;       tab-always-indent 'complete
-;;       backward-delete-char-untabify-method nil) ; Set to 'hungry to delete to beginning.
-
-;; (defun enable-tabs ()
-;;   "Enable indenting by tabs."
-;;   (setq indent-tabs-mode t)
-;;   (setq tab-width jfl-tab-width))
-
-;; (defun disable-tabs ()
-;;   "Disable indenting by tabs."
-;;   (setq indent-tabs-mode nil))
-
-;; (add-progtext-hook enable-tabs)
-;; (add-hook 'lisp-mode-hook 'disable-tabs)
-;; (add-hook 'emacs-lisp-mode-hook 'disable-tabs)
-;; (eval-after-load 'scheme '(add-hook 'scheme-mode-hook 'disable-tabs))
-
 ;; Shorten questions
 (fset 'yes-or-no-p 'y-or-n-p)
 
@@ -956,5 +948,3 @@
 ;; Local Variables:
 ;; flycheck-disabled-checkers: (emacs-lisp)
 ;; End:
-
-;;; init.el ends here
