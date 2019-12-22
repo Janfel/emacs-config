@@ -15,9 +15,9 @@
 ;; User Information
 (setq user-full-name           "Jan Felix Langenbach"
       user-mail-address        "o.hase3@gmail.com"
+      user-autoload-directory  (expand-file-name "autoload/" user-emacs-directory)
       user-lisp-directory      (expand-file-name "lisp/"     user-emacs-directory)
-      user-theme-directory     (expand-file-name "themes/"   user-emacs-directory)
-      user-autoload-directory  (expand-file-name "autoload/" user-emacs-directory))
+      user-theme-directory     (expand-file-name "themes/"   user-emacs-directory))
 
 ;;;; Constants
 
@@ -81,6 +81,11 @@
 (defconst HAS-DVIPNG
   (executable-find "dvipng")
   "Do we have dvipng?")
+
+(defconst HAS-JOKER
+  (executable-find "joker")
+  "Do we have joker?")
+
 
 ;;;; Package Initialization
 
@@ -122,7 +127,7 @@
 
 (defmacro uncomment (&rest forms)
   "Collects FORMS into `progn'.
-Useful to quickly uncomment a `comment'."
+ Useful to quickly uncomment a `comment'."
   (cons 'progn forms))
 
 (defmacro unbind-keys (&rest keys)
@@ -164,6 +169,23 @@ Useful to quickly uncomment a `comment'."
                 collect (macroexpand `(add-prog-hook ,hook))
                 collect (macroexpand `(add-text-hook ,hook)))))
 
+;;;; Something
+(defvar lisp-mode-common-hook nil
+  "Hook called by all Lisp modes for common initialization.")
+
+;;;; Modes
+
+(define-minor-mode whitespace-cleanup-mode
+  "Runs `whitespace-cleanup' before a file is saved."
+  :init-value t
+  :lighter nil
+  :keymap nil
+  :global t
+  :require 'whitespace
+  (if whitespace-cleanup-mode
+      (add-hook 'before-save-hook #'whitespace-cleanup)
+    (remove-hook 'before-save-hook #'whitespace-cleanup)))
+
 ;;;; Packages
 
 (use-package bind-key)
@@ -192,7 +214,10 @@ Useful to quickly uncomment a `comment'."
 
 (use-package company
   :hook ((prog-mode text-mode comint-mode) . company-mode)
-  :bind ("C-SPC" . company-complete))
+  :bind ("C-SPC" . company-complete)
+  :custom (company-selection-wrap-around t)
+  ;; :config (fset 'completion-at-point 'company-complete)
+  )
 
 ;; (use-package hydra
 ;;   :defer t)
@@ -200,10 +225,10 @@ Useful to quickly uncomment a `comment'."
 ;;; Text editing
 
 (comment (use-package folding
-  :hook (find-file . folding-mode-find-file-hook)
-  :config
-  (--each '((ruby-mode "#{{{" "#}}}" nil noforce))
-    (apply #'folding-add-to-marks-list it))) endcomment)
+           :hook (find-file . folding-mode-find-file-hook)
+           :config
+           (--each '((ruby-mode "#{{{" "#}}}" nil noforce))
+             (apply #'folding-add-to-marks-list it))) endcomment)
 
 (use-package hungry-delete
   :bind (("M-DEL" . hungry-delete-backward)
@@ -220,7 +245,7 @@ Useful to quickly uncomment a `comment'."
 ;;; Miscellaneous
 
 (use-package form-feed
-  :hook (emacs-lisp-mode . form-feed-mode))
+  :hook ((emacs-lisp-mode org-mode) . form-feed-mode))
 
 (use-package reformatter   ; https://github.com/purcell/reformatter.el
   :commands reformatter-define)
@@ -228,10 +253,14 @@ Useful to quickly uncomment a `comment'."
 (use-package flycheck
   :hook (after-init . global-flycheck-mode)
   :config
-  (eval-after-load 'cc-mode
-    '(setq-default
-      flycheck-gcc-language-standard "c++17"
-      flycheck-clang-language-standard "c++17")))
+  (add-hook 'c-mode-hook
+            (lambda ()
+              (setq flycheck-gcc-language-standard   "gnu18"
+                    flycheck-clang-language-standard "gnu18")))
+  (add-hook 'c++-mode-hook
+            (lambda ()
+              (setq flycheck-gcc-language-standard   "gnu++17"
+                    flycheck-clang-language-standard "gnu++17"))))
 
 (use-package format-all
   :bind ("C-c C-f" . format-all-buffer))
@@ -257,10 +286,10 @@ Useful to quickly uncomment a `comment'."
   :config
   (bind-keys
    :map undo-tree-map
-    ("C-z"    . undo-tree-undo)
-    ("<undo>" . undo-tree-undo)
-    ("C-S-z"  . undo-tree-redo)
-    ("<redo>" . undo-tree-redo)))
+   ("C-z"    . undo-tree-undo)
+   ("<undo>" . undo-tree-undo)
+   ("C-S-z"  . undo-tree-redo)
+   ("<redo>" . undo-tree-redo)))
 
 ;;; Games
 
@@ -364,12 +393,12 @@ Useful to quickly uncomment a `comment'."
 
 ;;; Smartparens
 
-(defun jfl/wrap-spaces (&rest _ignored)
+(defun jfl/sp/wrap-spaces (&rest _ignored)
   "Insert a space after the point."
   (insert ?\s)
   (backward-char))
 
-(defun jfl/newline-indent (&rest _ignored)
+(defun jfl/sp/newline-indent (&rest _ignored)
   "Insert a newline and indent."
   (newline-and-indent)
   (forward-line -1)
@@ -377,22 +406,39 @@ Useful to quickly uncomment a `comment'."
 
 (use-package smartparens
   :defer 0.2
-  :custom (sp-highlight-pair-overlay . nil)
-  :bind (("C-(" . sp-backward-sexp)
-         ("C-)" . sp-forward-sexp))
+  :custom ((sp-highlight-pair-overlay . nil)
+           (sp-escape-quotes-after-insert . nil))
+  :bind (:map smartparens-mode-map
+              ("C-(" . sp-backward-sexp)
+              ("C-)" . sp-forward-sexp)
+              ("C-M-SPC" . sp-mark-sexp))
   :config
   (require 'smartparens-config)
 
   (--each '("(" "{" "[")
     (sp-local-pair 'prog-mode it nil
-                   :post-handlers '(;; Remove this when #624 comes through.
-                                    (jfl/wrap-spaces "SPC")
-                                    ;; Open new line on RET after open brace.
-                                    (jfl/newline-indent "RET"))))
+                   :post-handlers
+                   '(;; Remove this when #624 comes through.
+                     (jfl/sp/wrap-spaces "SPC")
+                     ;; Open new line on RET after open brace.
+                     (jfl/sp/newline-indent "RET"))))
+
+  (sp-local-pair 'prog-mode "\\'" "\\'"
+                 :actions '(insert wrap autoskip navigate))
+
+  (sp-local-pair 'prog-mode "\\\"" "\\\""
+                 :actions '(insert wrap autoskip navigate))
+
+  (sp-with-modes sp-c-modes
+    (sp-local-pair "/* " " */"
+                   :actions '(insert wrap autoskip navigate))
+    (sp-local-pair "/**" " */"
+                   :actions '(insert wrap autoskip navigate)))
+
   ;; Language specific
   (eval-after-load 'pascal
     '(sp-local-pair 'pascal-mode "begin" "end"
-                    :post-handlers '((jfl/newline-indent "RET"))))
+                    :post-handlers '((jfl/sp/newline-indent "RET"))))
 
   (eval-after-load 'tex-mode
     '(sp-with-modes '(tex-mode
@@ -406,10 +452,10 @@ Useful to quickly uncomment a `comment'."
                       :unless '(sp-latex-point-after-backslash sp-in-math-p)
                       :post-handlers '(sp-latex-skip-double-quote))
 
-       (sp-local-pair "\\(" "\\)" :post-handlers '((jfl/wrap-spaces "SPC")
-                                                   (jfl/newline-indent "RET")))
-       (sp-local-pair "\\[" "\\]" :post-handlers '((jfl/wrap-spaces "SPC")
-                                                   (jfl/newline-indent "RET")))
+       (sp-local-pair "\\(" "\\)" :post-handlers '((jfl/sp/wrap-spaces "SPC")
+                                                   (jfl/sp/newline-indent "RET")))
+       (sp-local-pair "\\[" "\\]" :post-handlers '((jfl/sp/wrap-spaces "SPC")
+                                                   (jfl/sp/newline-indent "RET")))
        ))
 
   (defun sp-wrap-sexp (pair)
@@ -421,14 +467,33 @@ Useful to quickly uncomment a `comment'."
   (show-smartparens-global-mode))
 
 
-;;; Yasnippet WIP
+;;; Yasnippet
 (use-package yasnippet
   :defer 0.3
   :config
+  (add-hook 'snippet-mode-hook (lambda () (whitespace-cleanup-mode 0)))
   (yas-global-mode))
 
 (use-package yasnippet-snippets
   :after yasnippet)
+
+;;;; LSP Mode
+
+(use-package lsp-mode
+  :hook ((prog-mode LaTeX-mode) . lsp-deferred))
+
+(use-package lsp-ui
+  :hook (lsp-mode . lsp-ui-mode)
+  :custom ((lsp-ui-doc-enable t)
+           (lsp-ui-peek-enable t)
+           (lsp-ui-sideline-enable nil)
+           (lsp-ui-imenu-enable t)
+           (lsp-ui-flycheck-enable t)))
+
+(use-package company-lsp
+  :after (lsp-mode company)
+  :config (push #'company-lsp company-backends))
+
 
 ;;;; Builtin Modes
 
@@ -466,15 +531,54 @@ Useful to quickly uncomment a `comment'."
     :map Info-mode-map
     ("<mouse-8>" . Info-history-back)
     ("<mouse-9>" . Info-history-forward)))
+
+(eval-after-load 're-builder
+  '(bind-keys
+    :map reb-mode-map
+    ("C-c <control-c>" . reb-copy)))
+
 
 ;;;; Languages
+
+;;; CC Modes
+
+(add-hook 'c-mode-common-hook (lambda () (setq tab-width c-basic-offset)))
+
+;;; Clojure
+
+(use-package clojure-mode
+  :mode (("\\.\\(clj\\|dtm\\|edn\\)\\'"       . clojure-mode)
+         ("\\.cljs\\'"                        . clojurescript-mode)
+         ("\\.cljc\\'"                        . clojurec-mode)
+         ("\\(?:build\\|profile\\)\\.boot\\'" . clojure-mode))
+  :init
+  (add-hook 'clojure-mode-hook (lambda () (run-hooks 'lisp-mode-common-hook))))
+
+(use-package cider
+  ;; https://github.com/clojure-emacs/cider
+  :after clojure-mode
+  :bind (:map cider-mode-map
+              ("C-c C-f" . nil)))
+
+(use-package flycheck-clojure
+  ;; https://github.com/clojure-emacs/squiggly-clojure
+  ;; Have to install linters
+  :after (flycheck cider))
+
+(if HAS-JOKER
+    (use-package flycheck-joker
+      ;; https://github.com/candid82/flycheck-joker
+      :after (flycheck clojure)))
 
 ;;; Common Lisp
 
 (defvar quicklisp-home (or (getenv "QUICKLISP_HOME") "~/quicklisp/")
   "The directory where quicklisp is installed.")
 
+(add-hook 'lisp-mode-hook (lambda () (run-hooks 'lisp-mode-common-hook)))
+
 (use-package slime
+  ;; https://github.com/slime/slime
   :commands slime
   :custom (;;(slime-net-coding-system . ('utf-8-unix))
            (slime-repl-history-file . ((expand-file-name "slime-history.eld" user-emacs-directory))))
@@ -490,24 +594,33 @@ Useful to quickly uncomment a `comment'."
 
 ;;; Elisp
 
-(add-hook 'emacs-lisp-mode-hook (lambda () (set 'comment-column 40)))
+(add-hook
+ 'emacs-lisp-mode-hook
+ (lambda ()
+   (run-hooks 'lisp-mode-common-hook)
+   (setq comment-column 40)))
 
 ;;; Haskell
 
 (use-package haskell-mode
-  :mode (("\\.hsc\\'" . haskell-mode)
-         ("\\.l[gh]s\\'" . literate-haskell-mode)
-         ("\\.hsig\\'" . haskell-mode)
-         ("\\.[gh]s\\'" . haskell-mode)
-         ("\\.cabal\\'" . haskell-cabal-mode)
-         ("\\.chs\\'" . haskell-c2hs-mode)
-         ("\\.ghci\\'" . ghci-script-mode)
+  :mode (("\\.hsc\\'"        . haskell-mode)
+         ("\\.l[gh]s\\'"     . literate-haskell-mode)
+         ("\\.hsig\\'"       . haskell-mode)
+         ("\\.[gh]s\\'"      . haskell-mode)
+         ("\\.cabal\\'"      . haskell-cabal-mode)
+         ("\\.chs\\'"        . haskell-c2hs-mode)
+         ("\\.ghci\\'"       . ghci-script-mode)
          ("\\.dump-simpl\\'" . ghc-core-mode)
-         ("\\.hcr\\'" . ghc-core-mode)))
+         ("\\.hcr\\'"        . ghc-core-mode))
+  :bind (:map haskell-mode-map
+              ("C-c C-z" . haskell-interactive-switch)
+              ("C-c C-c" . haskell-process-load-file))
+  :config (add-hook 'haskell-mode-hook (lambda () (setq indent-tabs-mode nil))))
 
 ;;; LaTeX
 
-(eval-after-load 'tex-mode '(add-hook 'latex-mode-hook #'latex-electric-env-pair-mode))
+(add-hook 'latex-mode-hook #'latex-electric-env-pair-mode)
+(add-hook 'latex-mode-hook (lambda () (setq tab-width tex-indent-basic)))
 
 (use-package latex-preview-pane
   :commands latex-preview-pane-mode)
@@ -537,10 +650,18 @@ Useful to quickly uncomment a `comment'."
        "C-c C-t" "toggle")))
 
 (use-package company-auctex
-  :after tex company
-  :config
-  (company-auctex-init))
+  :after (tex company)
+  :config (company-auctex-init))
 
+;;; Lua
+
+(use-package lua-mode
+  ;; https://github.com/immerrr/lua-mode/
+  ;; try lsp-lua-emmy https://github.com/EmmyLua/EmmyLua-LanguageServer
+  :mode "\\.lua$"
+  :interpreter "lua"
+  :custom (lua-indent-level 2)
+  :config (setq tab-width lua-indent-level))
 
 ;;; Markdown
 
@@ -550,6 +671,7 @@ Useful to quickly uncomment a `comment'."
          ("\\.md\\'" . markdown-mode)
          ("\\.markdown\\'" . markdown-mode))
   :config
+  (setq tab-width markdown-list-indent-width)
   (reformatter-define markdownfmt
     :program "markdownfmt"))
 
@@ -563,15 +685,15 @@ Useful to quickly uncomment a `comment'."
          (remove 'company-capf company-backends))))
 
 (add-hook 'pascal-mode-hook #'jfl/pascal/company-setup)
+(add-hook 'pascal-mode-hook (lambda () (setq tab-width pascal-indent-level)))
 
-(with-eval-after-load 'pascal
-  (setq pascal-indent-level 2)
-  (reformatter-define ptop
-    :program "/usr/bin/ptop"
-    :args `("-i" ,(number-to-string pascal-indent-level)
-            "-c" "/home/janfel/.config/pascal/ptop.cfg"
-            "/dev/stdin"
-            "/dev/stdout"))
+(eval-after-load 'pascal
+  '(reformatter-define ptop
+     :program "/usr/bin/ptop"
+     :args `("-i" ,(number-to-string pascal-indent-level)
+             "-c" "/home/janfel/.config/pascal/ptop.cfg"
+             "/dev/stdin"
+             "/dev/stdout"))
 
   (bind-key "C-c C-f" #'ptop-buffer pascal-mode-map))
 
@@ -584,6 +706,32 @@ Useful to quickly uncomment a `comment'."
   :after python
   :bind (:map python-mode-map
               ("C-c C-f" . python-black-buffer)))
+
+;; (use-package jedi
+;;   :after python
+;;   :hook (python-mode . jedi:setup))
+
+(use-package company-jedi
+  :after (python company)
+  :config (push #'company-jedi company-backends))
+
+;;; Rust
+
+(use-package rust-mode
+  :mode "\\.rs\\'")
+
+(use-package cargo
+  :after rust-mode
+  :hook (rust-mode . cargo-minor-mode))
+
+(use-package flycheck-rust
+  :after (flycheck rust-mode)
+  :hook (flycheck-mode . flycheck-rust-setup))
+
+;;; Scheme
+
+(add-hook 'scheme-mode-hook (lambda () (run-hooks 'lisp-mode-common-hook)))
+
 
 ;;; Themes
 
@@ -626,10 +774,10 @@ Useful to quickly uncomment a `comment'."
 
 (defun other-window-backwards (count &optional all-frames)
   "Select another window going backwards in cyclic ordering of windows.
-This function goes in the opposite direction of
-`other-window' and is implemented in terms of it.
-The argument COUNT is multiplied with -1 and
-ALL-FRAMES is passed directly to `other-window'."
+ This function goes in the opposite direction of
+ `other-window' and is implemented in terms of it.
+ The argument COUNT is multiplied with -1 and
+ ALL-FRAMES is passed directly to `other-window'."
   (interactive "p")
   (other-window (* count -1) all-frames))
 
@@ -643,6 +791,10 @@ ALL-FRAMES is passed directly to `other-window'."
   (interactive "*r")
   (let ((inhibit-read-only t))
     (put-text-property start end 'read-only nil)))
+
+(defun jfl-shebang-regex (program)
+  "Create a regexp matching a shebang calling PROGRAM."
+  (concat "^#!/\\(usr/\\)?\\(local/\\)?bin/\\(env \\)?\\(-S \\)?" program))
 
 ;; (cl-loop for (func . doc) in
 ;;          '(("find-config-directory" . "Open the config directory in dired")
@@ -681,12 +833,14 @@ ALL-FRAMES is passed directly to `other-window'."
 (define-key key-translation-map (kbd "C-ä") (kbd "C-c"))
 
 (bind-key "C-<return>" (kbd "C-RET") key-translation-map)
+(bind-key "S-<return>" (kbd "S-RET") key-translation-map)
 (if IS-WINDOWS (define-key key-translation-map (kbd "<apps>") (kbd "<menu>")))
 
 ;; Set keys
 (bind-keys
  ("C-<tab>"           . other-window)
  ("C-S-<iso-lefttab>" . other-window-backwards)
+ ("C-a"               . mark-whole-buffer)
  ("C-v"               . yank)
  ("C-s"               . save-buffer)
  ("C-S-s"             . write-file)
@@ -697,13 +851,13 @@ ALL-FRAMES is passed directly to `other-window'."
  ("C-M-<next>"        . forward-page)
  ("<mouse-8>"         . backward-page)
  ("<mouse-9>"         . forward-page)
- ("M-SPC"             . set-mark-command)
  ("S-SPC"             . cycle-spacing)
- ("C-S-k"             . kill-whole-line))
+ ("M-SPC"             . set-mark-command)
+ ("C-S-k"             . kill-whole-line)
+ ("S-RET"             . comment-indent-new-line))
 
 (bind-keys*
- ("C-e" . execute-extended-command)
- )
+ ("C-e" . execute-extended-command))
 
 (bind-keys
  :prefix "M-f"
@@ -745,11 +899,34 @@ ALL-FRAMES is passed directly to `other-window'."
 
 (if HAS-GUI
     (add-progtext-hook hl-line-mode))   ; Highlight current line
-
-;;; Behaviour hooks
-(add-hook 'before-save-hook #'whitespace-cleanup) ; Clean up on save
 
 ;;;; Miscellaneous
+
+(progn ; Indentation
+  (setq-default
+   tab-width 4
+   indent-tabs-mode t)
+  (add-hook 'lisp-mode-common-hook (lambda () (setq indent-tabs-mode nil)))
+  )
+
+;; Indentation
+;; (setq jfl-tab-width 4
+;;       tab-always-indent 'complete
+;;       backward-delete-char-untabify-method nil) ; Set to 'hungry to delete to beginning.
+
+;; (defun enable-tabs ()
+;;   "Enable indenting by tabs."
+;;   (setq indent-tabs-mode t)
+;;   (setq tab-width jfl-tab-width))
+
+;; (defun disable-tabs ()
+;;   "Disable indenting by tabs."
+;;   (setq indent-tabs-mode nil))
+
+;; (add-progtext-hook enable-tabs)
+;; (add-hook 'lisp-mode-hook 'disable-tabs)
+;; (add-hook 'emacs-lisp-mode-hook 'disable-tabs)
+;; (eval-after-load 'scheme '(add-hook 'scheme-mode-hook 'disable-tabs))
 
 ;; Shorten questions
 (fset 'yes-or-no-p 'y-or-n-p)
@@ -761,8 +938,6 @@ ALL-FRAMES is passed directly to `other-window'."
 ;; Make shell open in the current buffer.
 (push '("^\\*shell\\*$" . (display-buffer-same-window)) display-buffer-alist)
 
-(setq-default cursor-type 'bar)
-
 ;; Smooth Scrolling
 ;; Copied from: https://github.com/MatthewZMD/.emacs.d/blob/master/elisp/init-scroll.el
 (setq scroll-step 1
@@ -772,7 +947,7 @@ ALL-FRAMES is passed directly to `other-window'."
       scroll-down-aggressively 0.01
       auto-window-vscroll nil
       fast-but-imprecise-scrolling nil
-      mouse-wheel-scroll-amount '(1 ((shift) . 5))
+      mouse-wheel-scroll-amount '(1 ((control) . 5))
       mouse-wheel-progressive-speed nil
       ;; Horizontal Scroll
       hscroll-step 1
